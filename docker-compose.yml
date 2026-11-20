@@ -1,0 +1,25 @@
+services:
+  ai:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8095:8000"
+    volumes:
+      - ai_data:/data
+    depends_on:
+      - ollama
+      - searxng
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    volumes:
+      - ./searxng:/etc/searxng:ro
+volumes:
+  ai_data:
+  ollama_data:
