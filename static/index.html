@@ -151,5 +151,6 @@ document.getElementById("mstart").onclick=async()=>{
  alert("Tarefa adicionada à fila.");await refreshMedia()
  }catch(e){alert("Não foi possível gerar: "+e.message)}
 };
-const oldLogin=login;login=async()=>{await oldLogin();if(password)refreshMedia()};
+document.getElementById("enter").onclick=async()=>{await login();if(password)refreshMedia()};
+setInterval(()=>{if(password)refreshMedia()},8000);
 </script></body></html>
