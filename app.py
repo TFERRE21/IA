@@ -225,3 +225,22 @@ async def approve(ident: str):
         db.commit()
         return {"ok":True,"commit":response.json().get("commit",{}).get("sha")}
     finally: db.close()
+
+
+# Rotas de mídia protegidas pela mesma autenticação do painel.
+import asyncio
+from fastapi import Depends as _Depends
+from media import router as media_router, worker as media_worker
+app.include_router(media_router, dependencies=[_Depends(auth)])
+
+@app.on_event("startup")
+async def start_media_worker():
+    app.state.media_task = asyncio.create_task(media_worker())
+
+@app.on_event("shutdown")
+async def stop_media_worker():
+    app.state.media_task.cancel()
+    try:
+        await app.state.media_task
+    except asyncio.CancelledError:
+        pass
