@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minha IA • GitHub + Pesquisa</title>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0d111b;color:#e6edf7}
+header{border-bottom:1px solid #293244;background:#141c2c;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+header h1{font-size:21px;margin:0}header span,.muted{color:#9eacc1;font-size:13px}
+main{max-width:1200px;margin:auto;padding:22px;display:grid;grid-template-columns:minmax(0,2fr) minmax(290px,1fr);gap:18px}
+.panel{background:#151e2e;border:1px solid #2c384c;border-radius:16px;overflow:hidden}
+.panel h2{font-size:16px;margin:0;padding:16px;border-bottom:1px solid #2c384c}
+#conversation{height:58vh;min-height:320px;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:15px}
+.msg{white-space:pre-wrap;line-height:1.6;padding:13px 15px;border-radius:13px;max-width:92%;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:#254c9a}.msg.assistant{align-self:flex-start;background:#263248}
+.msg a{color:#91bdff}.composer{padding:14px;display:flex;gap:10px;border-top:1px solid #2c384c}
+textarea{background:#0e1523;color:white;border:1px solid #465570;border-radius:10px;flex:1;min-height:66px;padding:12px;resize:vertical;font:inherit}
+button,input{font:inherit}button{border:0;border-radius:10px;padding:11px 15px;background:#467fff;color:white;font-weight:650;cursor:pointer}
+button:hover{filter:brightness(1.13)}button:disabled{opacity:.5;cursor:wait}.secondary{background:#39485e}.danger{background:#a43e4e}
+#proposals{padding:15px;max-height:63vh;overflow:auto}.proposal{border:1px solid #39475b;padding:12px;border-radius:10px;margin-bottom:12px}
+.proposal strong{display:block;overflow-wrap:anywhere}.proposal p{font-size:13px;overflow-wrap:anywhere}.proposal pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;background:#0c121e;padding:10px;border-radius:6px;font-size:12px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{padding:8px 10px;font-size:12px}
+#login{position:fixed;inset:0;background:#0d111bf2;z-index:4;display:flex;align-items:center;justify-content:center;padding:22px}
+.loginbox{background:#172235;padding:30px;border:1px solid #3e4b62;border-radius:16px;width:min(100%,390px)}
+.loginbox input{display:block;width:100%;padding:12px;margin:16px 0;background:#0d1625;color:white;border:1px solid #485973;border-radius:8px}
+.loginbox button{width:100%}#status{color:#9eacc1;font-size:13px;margin:0 14px 13px}
+small{color:#a8b7cc} @media(max-width:800px){main{grid-template-columns:1fr;padding:12px}#conversation{height:54vh}header{padding:13px}}
+</style></head><body>
+<div id="login"><div class="loginbox"><h2>🤖 Minha IA</h2><p class="muted">Entre com a senha configurada na sua VPS. A senha permanece apenas na memória desta aba.</p>
+<input type="password" id="password" placeholder="Senha do painel" autocomplete="current-password">
+<button id="enter">Entrar no painel</button><p id="error" style="color:#ff9c9c"></p></div></div>
+<header><div><h1>🤖 Minha IA</h1><span id="model">Pesquisa web • GitHub • Ollama</span></div><button class="secondary" id="logout">Sair</button></header>
+<main><section class="panel"><h2>Conversa com sua IA</h2><div id="conversation"><div class="msg assistant">Olá! Posso pesquisar na internet, ler seus repositórios autorizados e propor alterações no GitHub. Toda gravação precisa da sua aprovação.</div></div>
+<div class="composer"><textarea id="question" placeholder="Ex.: Leia o README.md de TFERRE21/IA e proponha melhorias..."></textarea><button id="send">Enviar</button></div><p id="status">Pronto para conversar.</p></section>
+<aside class="panel"><h2>Alterações no GitHub <button class="secondary" id="refresh" style="float:right;padding:4px 9px">Atualizar</button></h2>
+<div style="padding:12px 15px" class="muted" id="repositories">Repositórios permitidos: carregando...</div>
+<div id="proposals"><p class="muted">Nenhuma proposta carregada.</p></div>
+<div style="padding:14px;border-top:1px solid #2c384c"><small>⚠️ Confira cada arquivo antes de aprovar. O commit será aplicado ao branch padrão do repositório autorizado.</small></div></aside></main>
+<script>
+let password="", history=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"");
+function api(path,opts={}){
+  return fetch(path,{...opts,headers:{"Authorization":"Basic "+btoa("admin:"+password),"Content-Type":"application/json",...(opts.headers||{})}})
+   .then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.detail||("HTTP "+r.status));return d});
+}
+function message(role,content){
+  const el=document.createElement("div");el.className="msg "+role;el.textContent=content;$("conversation").append(el);
+  $("conversation").scrollTop=$("conversation").scrollHeight;
+}
+function loginError(e){$("error").textContent=e.message||String(e)}
+async function login(){
+  password=$("password").value;
+  try{const cfg=await api("/api/config");$("login").style.display="none";$("password").value="";
+    $("model").textContent="Modelo: "+cfg.model;$("repositories").textContent="Autorizados: "+(cfg.repositories.join(", ")||"nenhum");
+    refresh();
+  }catch(e){password="";loginError(e)}
+}
+$("enter").onclick=login;$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+$("logout").onclick=()=>{password="";history=[];$("login").style.display="flex";};
+async function send(){
+  let value=$("question").value.trim();if(!value)return;
+  $("question").value="";message("user",value);$("send").disabled=true;$("status").textContent="A IA está trabalhando...";
+  try{
+    const res=await api("/api/chat",{method:"POST",body:JSON.stringify({message:value,history})});
+    message("assistant",res.answer);history.push({role:"user",content:value},{role:"assistant",content:res.answer});
+    history=history.slice(-12);$("status").textContent="Concluído.";await refresh();
+  }catch(e){message("assistant","Erro: "+e.message);$("status").textContent="Não foi possível executar a solicitação."}
+  finally{$("send").disabled=false}
+}
+$("send").onclick=send;
+$("question").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
+async function refresh(){
+  try{
+    const data=await api("/api/proposals");const node=$("proposals");node.replaceChildren();
+    if(!data.items.length){const p=document.createElement("p");p.className="muted";p.textContent="Ainda não há propostas.";node.append(p);return}
+    for(const item of data.items){
+      const div=document.createElement("div");div.className="proposal";
+      const title=document.createElement("strong");title.textContent=item.repo+" / "+item.path;div.append(title);
+      const desc=document.createElement("p");desc.textContent=item.explanation||"Sem descrição";div.append(desc);
+      const state=document.createElement("p");state.textContent="Status: "+item.status;div.append(state);
+      const pre=document.createElement("pre");pre.textContent=item.content;div.append(pre);
+      if(item.status==="pending"){
+        const actions=document.createElement("div");actions.className="actions";
+        for(const [label,action,cls] of [["Aprovar commit","approve",""],["Rejeitar","reject","danger"]]){
+          const b=document.createElement("button");b.textContent=label;b.className=cls;
+          b.onclick=async()=>{
+            if(action==="approve"&&!confirm("Você revisou o conteúdo integral do arquivo? Aplicar commit em "+item.repo+"?"))return;
+            b.disabled=true;try{await api("/api/proposals/"+item.id+"/"+action,{method:"POST"});await refresh();alert(action==="approve"?"Commit realizado no GitHub.":"Proposta rejeitada.");}
+            catch(e){b.disabled=false;alert("Falha: "+e.message)}
+          };
+          actions.append(b)
+        }
+        div.append(actions);
+      }node.append(div);
+    }
+  }catch(e){$("proposals").textContent="Erro: "+e.message}
+}
+$("refresh").onclick=refresh;
+</script></body></html>
