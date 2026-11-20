@@ -7,10 +7,13 @@ services:
       - "127.0.0.1:8095:8000"
     volumes:
       - ai_data:/data
+    mem_limit: 1200m
     depends_on:
       - ollama
       - searxng
   ollama:
+    mem_limit: 7g
+    cpus: 3
     image: ollama/ollama:latest
     restart: unless-stopped
     volumes:
