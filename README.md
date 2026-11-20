@@ -64,3 +64,19 @@ docker compose ps
 docker compose logs --tail=80 ai
 curl -fsS http://127.0.0.1:8095/health
 ```
+
+## Hospedagem que obriga Node.js (erro package.json ENOENT)
+
+O repositório agora também contém `package.json` e `server.js` para hospedagem Node.js sem necessidade de alterar buildpack.
+
+- Runtime: **Node.js 18 ou superior**.
+- Install: `npm install` (sem bibliotecas externas).
+- Start: `npm start` ou `node server.js`.
+- Porta: lê `PORT` do painel (padrão 3000). Health: `GET /health`.
+- Arquivos de interface: `static/index.html`.
+- Configure as variáveis de ambiente no painel: `PANEL_PASSWORD`, `GITHUB_TOKEN`, `GITHUB_ALLOWED_REPOS`, `OLLAMA_URL`, `OLLAMA_MODEL`, `SEARXNG_URL`, `COMFYUI_URL`, `COMFYUI_CHECKPOINT`.
+- Se a hospedagem recriar o sistema de arquivos a cada deploy, monte um volume persistente e defina `DATA_DIR` apontando para esse volume. Sem persistência, o histórico de propostas e imagens poderá desaparecer.
+- A versão Node inclui painel, chat Ollama, pesquisa web (com SearXNG configurado), GitHub com aprovação e geração **de imagens** ComfyUI. A geração de vídeo MP4 do módulo Python/FFmpeg **não está disponível na modalidade Node** e retorna uma mensagem explícita. Para vídeos storyboard utilize Docker Compose.
+- O contêiner Node não instala nem inicia Ollama, SearXNG ou ComfyUI: eles precisam estar acessíveis nos endereços configurados. Em particular, `localhost` dentro do contêiner não é a VPS nem a GPU Windows.
+- Restrinja o painel com HTTPS; não exponha chaves no frontend. Os endpoints usam autenticação HTTP Basic e devem ser acessados apenas por HTTPS.
+- **Não basta publicar no GitHub**: o gerenciador de deploy precisa atualizar o código (redeploy/rebuild). Se ainda surgir erro `package.json`, confirme URL do repositório e branch main vinculados ao serviço `ia`, o diretório raiz e a sincronização do último commit.
