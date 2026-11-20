@@ -49,3 +49,18 @@ Teste localmente: `curl http://127.0.0.1:8095/health`.
 - O sistema possui limites de duração, dimensões, tamanho de prompt e fila para proteção de recursos, não bloqueios de conteúdo por geografia.
 - Para gerar animações verdadeiras, vídeo com áudio e sincronização, será necessário adicionar um motor de vídeo específico e dimensionar o hardware.
 - Configure limites Docker e monitore o uso da VPS. Não há garantia de execução sem travamentos; falhas são registradas no painel.
+
+## Erro ENOENT /app/package.json na plataforma de hospedagem
+
+Este repositório **não é Node.js**. Caso a plataforma apresente `npm error ENOENT /app/package.json`, ela selecionou um *buildpack* Node incorretamente. Não execute `npm install` e não crie um `package.json` vazio: isso não inicializa o FastAPI.
+
+Na configuração do projeto `ia`, selecione **Dockerfile** como método de construção, com contexto `.`, arquivo `Dockerfile`, porta interna `8000`, e desative os comandos automáticos de instalação/inicialização Node.js. Defina as variáveis do `.env.example` como segredos na plataforma. Reimplante reconstruindo a imagem. O health check disponível é `GET /health`.
+
+Se a hospedagem não aceitar Dockerfile, use SSH com Docker Compose para executar o projeto separadamente. **Atenção:** o Compose atual vincula a porta `8095` apenas à interface `127.0.0.1`; configure HTTPS/proxy reverso para acessá-la remotamente. Não remova os containers de outros projetos.
+
+Diagnóstico via SSH:
+```bash
+docker compose ps
+docker compose logs --tail=80 ai
+curl -fsS http://127.0.0.1:8095/health
+```
