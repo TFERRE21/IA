@@ -1,8 +1,9 @@
 FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py .
+COPY app.py media.py .
 COPY static ./static
 RUN useradd -m -u 10001 agent && mkdir /data && chown agent:agent /data
 USER agent
