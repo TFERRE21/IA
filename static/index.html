@@ -33,7 +33,22 @@ small{color:#a8b7cc} @media(max-width:800px){main{grid-template-columns:1fr;padd
 <aside class="panel"><h2>Alterações no GitHub <button class="secondary" id="refresh" style="float:right;padding:4px 9px">Atualizar</button></h2>
 <div style="padding:12px 15px" class="muted" id="repositories">Repositórios permitidos: carregando...</div>
 <div id="proposals"><p class="muted">Nenhuma proposta carregada.</p></div>
-<div style="padding:14px;border-top:1px solid #2c384c"><small>⚠️ Confira cada arquivo antes de aprovar. O commit será aplicado ao branch padrão do repositório autorizado.</small></div></aside></main>
+<div style="padding:14px;border-top:1px solid #2c384c"><small>⚠️ Confira cada arquivo antes de aprovar. O commit será aplicado ao branch padrão do repositório autorizado.</small></div></aside>
+<section class="panel" style="grid-column:1/-1">
+<h2>🎨 Estúdio de imagens e vídeos</h2>
+<div style="padding:16px;display:grid;gap:12px">
+<p class="muted">Imagens com ComfyUI. Vídeos desta versão são sequências de imagens (storyboard) convertidas em MP4, não animação generativa real. Requer GPU/ComfyUI configurados.</p>
+<div id="mediastatus" class="muted">Verificando o motor de mídia...</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px">
+<label>Formato <select id="mk" style="padding:9px;background:#0e1523;color:white"><option value="image">Imagem PNG</option><option value="video">Vídeo MP4 (storyboard)</option></select></label>
+<label>Largura <select id="mw" style="padding:9px;background:#0e1523;color:white"><option>512</option><option>768</option><option>256</option></select></label>
+<label>Altura <select id="mh" style="padding:9px;background:#0e1523;color:white"><option>512</option><option>768</option><option>256</option></select></label>
+<label>Cenas <input id="msc" type="number" value="4" min="2" max="12" style="width:70px;padding:9px;background:#0e1523;color:white"/></label>
+<label>Segundos <input id="mseconds" type="number" value="20" min="4" max="120" style="width:75px;padding:9px;background:#0e1523;color:white"/></label>
+</div>
+<textarea id="mprompt" placeholder="Descreva a imagem ou as cenas do vídeo..." style="width:100%;min-height:85px"></textarea>
+<div><button id="mstart">Gerar mídia</button> <button class="secondary" id="mrefresh">Atualizar fila</button></div>
+<div id="mjobs"></div></div></section></main>
 <script>
 let password="", history=[];
 const $=id=>document.getElementById(id);
@@ -95,4 +110,46 @@ async function refresh(){
   }catch(e){$("proposals").textContent="Erro: "+e.message}
 }
 $("refresh").onclick=refresh;
+</script><script>
+async function refreshMedia(){
+ try{
+  const [s,j]=await Promise.all([api("/api/media/status"),api("/api/media/jobs")]);
+  document.getElementById("mediastatus").textContent="ComfyUI: "+(s.online?"conectado":"desconectado")+(s.configured?"":" · configuração incompleta");
+  const node=document.getElementById("mjobs");node.replaceChildren();
+  for(const job of j.jobs){
+   const d=document.createElement("div");d.className="proposal";
+   const h=document.createElement("strong");h.textContent=(job.kind==="image"?"Imagem":"Vídeo")+" · "+job.status+" · "+job.progress+"%";d.append(h);
+   const p=document.createElement("p");p.textContent=job.prompt;d.append(p);
+   if(job.error){const e=document.createElement("p");e.textContent="Erro: "+job.error;d.append(e)}
+   if(job.status==="done"){
+    const a=document.createElement("button");a.textContent="Baixar arquivo";
+    a.onclick=async()=>{
+      try{const r=await fetch("/api/media/jobs/"+encodeURIComponent(job.id)+"/file",{headers:{Authorization:"Basic "+btoa("admin:"+password)}});
+      if(!r.ok)throw Error("Falha no download");
+      const url=URL.createObjectURL(await r.blob()),link=document.createElement("a");
+      link.href=url;link.download=job.kind==="image"?"imagem.png":"video.mp4";link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),15000)
+      }catch(e){alert(e.message)}
+    };d.append(a)
+   }else if(["queued","running"].includes(job.status)){
+    const b=document.createElement("button");b.className="danger";b.textContent="Cancelar";
+    b.onclick=async()=>{await api("/api/media/jobs/"+encodeURIComponent(job.id)+"/cancel",{method:"POST"});refreshMedia()};d.append(b)
+   }
+   node.append(d)
+  }
+  if(!j.jobs.length)node.textContent="Fila vazia.";
+ }catch(e){document.getElementById("mediastatus").textContent=e.message}
+}
+document.getElementById("mrefresh").onclick=refreshMedia;
+document.getElementById("mstart").onclick=async()=>{
+ try{
+ const kind=document.getElementById("mk").value;
+ await api("/api/media/jobs",{method:"POST",body:JSON.stringify({
+ kind,prompt:document.getElementById("mprompt").value,
+ width:Number(document.getElementById("mw").value),height:Number(document.getElementById("mh").value),
+ scenes:Number(document.getElementById("msc").value),seconds:Number(document.getElementById("mseconds").value)})});
+ alert("Tarefa adicionada à fila.");await refreshMedia()
+ }catch(e){alert("Não foi possível gerar: "+e.message)}
+};
+const oldLogin=login;login=async()=>{await oldLogin();if(password)refreshMedia()};
 </script></body></html>
