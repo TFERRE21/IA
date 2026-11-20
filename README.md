@@ -35,3 +35,17 @@ Teste localmente: `curl http://127.0.0.1:8095/health`.
 - Pesquisas web podem conter conteúdo malicioso: os resultados são tratados como dados, não como instruções.
 - Se sua VPS tiver outros serviços importantes, acompanhe RAM e CPU do Ollama e configure limites antes de usar continuamente.
 - O SearXNG pode sofrer bloqueios dos motores externos e não garante cobertura equivalente à pesquisa do ChatGPT.
+
+## Estúdio de imagens e vídeos (adicionado)
+
+- Geração de imagens PNG com ComfyUI via API, utilizando um checkpoint compatível com os nós padrão.
+- Vídeo MP4 em formato **storyboard de imagens estáticas sequenciais** (sem movimento generativo, personagens animados, voz ou trilha nesta versão).
+- Fila persistente no SQLite: tarefas pendentes retornam à fila após reiniciar; uma tarefa por vez para reduzir risco de sobrecarga.
+- Progresso por cena, status, erros, cancelamento e download na interface.
+- Configure `COMFYUI_URL` como endereço privado do ComfyUI acessível da VPS e `COMFYUI_CHECKPOINT` como nome do checkpoint **já instalado no ComfyUI**.
+- **Nunca exponha o ComfyUI sem autenticação à internet**. Use rede privada/VPN, proxy autenticado ou túnel seguro.
+- O ComfyUI não é instalado neste Compose porque normalmente precisa rodar no computador com GPU. A API aceita acesso remoto privado.
+- `MEDIA_MAX_WIDTH` e `MEDIA_MAX_HEIGHT` controlam a resolução máxima; a GPU pode precisar de valores menores.
+- O sistema possui limites de duração, dimensões, tamanho de prompt e fila para proteção de recursos, não bloqueios de conteúdo por geografia.
+- Para gerar animações verdadeiras, vídeo com áudio e sincronização, será necessário adicionar um motor de vídeo específico e dimensionar o hardware.
+- Configure limites Docker e monitore o uso da VPS. Não há garantia de execução sem travamentos; falhas são registradas no painel.
